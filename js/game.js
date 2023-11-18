@@ -32,6 +32,9 @@ function preload() {
 function create() {
   const self = this;
 
+  this.score = { red: 0, blue: 1 };
+  this.scoreState = false;
+
   this.matter.world.setBounds(0, 0, 1210, 910, 32, false, false, true, true);
   this.goal1 = this.matter.add.rectangle(-5, 455, 10, 310, {
     isSensor: true,
@@ -92,10 +95,12 @@ function create() {
   this.ball.setBounce(0.8);
 
   this.players = this.add.group();
+  this.redTeam = this.add.group();
+  this.blueTeam = this.add.group();
 
   io.on("connection", function (socket) {
     console.log("a user connected");
-
+    console.log(self.redTeam.children.length);
     // create a new player and add it to our players object
     players[socket.id] = {
       x: Math.floor(Math.random() * 700) + 50,
@@ -112,6 +117,7 @@ function create() {
     };
     // add player to server
     addPlayer(self, players[socket.id]);
+
     // send the players object to the new player
     socket.emit("currentPlayers", players);
     // update all other players of the new player
@@ -160,7 +166,46 @@ function update() {
       this.matter.body.setSpeed(this.ball.body, this.ball.body.speed * 1.2);
     }
   });
-  io.emit("gameUpdates", { players, ball: this.ball });
+
+  if (
+    this.matter.collision.collides(this.goal1, this.ball.body) &&
+    !this.scoreState
+  ) {
+    this.scoreState = true;
+    this.score.red += 1;
+    resetField(this, this.players, this.ball);
+  }
+
+  if (
+    this.matter.collision.collides(this.goal2, this.ball.body) &&
+    !this.scoreState
+  ) {
+    this.scoreState = true;
+    this.score.blue += 1;
+    resetField(this, this.players, this.ball);
+  }
+
+  io.emit("gameUpdates", { players, ball: this.ball, score: this.score });
+}
+
+function resetField(self, players, ball) {
+  setTimeout(() => {
+    ball.setPosition(1210 / 2, 910 / 2);
+    self.scoreState = false;
+    ball.setVelocity(0);
+    ball.setAngularVelocity(0);
+
+    // let redCount = 0;
+    // let blueCount = 0;
+
+    // players.getChildren().forEach(player => {
+    //     if(player.team == "red") {
+
+    //     } else if(player.team == "blue") {
+
+    //     }
+    // })
+  }, 500);
 }
 
 function handlePlayerInput(self, playerId, input) {
@@ -182,6 +227,12 @@ function addPlayer(self, playerInfo) {
 
   player.setScale(0.25);
   player.setFixedRotation(0);
+
+  if (player.team == "red") {
+    self.redTeam.add(player);
+  } else if (player.team == "blue") {
+    self.blueTeam.add(player);
+  }
 
   self.players.add(player);
 }
