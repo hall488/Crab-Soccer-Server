@@ -1,15 +1,51 @@
+const path = require("path");
+const jsdom = require("jsdom");
 const express = require("express");
-const { createServer } = require("http");
-const { Server } = require("socket.io");
+const app = express();
+const server = require("http").Server(app);
+const io = require("socket.io")(server, {
+  cors: {
+    origin: "http://localhost:5173",
+  },
+});
 
-// const app = express();
-// const server = createServer(app);
-const io = new Server({cors: {
-    origin: "http://localhost:5173"
-  }});
+const Datauri = require("datauri");
+const datauri = new Datauri();
+const { JSDOM } = jsdom;
 
-io.on("connection", async (socket) => {
-    console.log(`Socket ${socket.id} connected`)
-})
+app.use(express.static(__dirname + "/public"));
+app.get("/", function (req, res) {
+  res.sendFile(__dirname + "/index.html");
+});
 
-io.listen(4000, () => console.log(`Listening on port 4000`));
+function setupAuthoritativePhaser() {
+  JSDOM.fromFile(path.join(__dirname, "index.html"), {
+    // To run the scripts in the html file
+    runScripts: "dangerously",
+    // Also load supported external resources
+    resources: "usable",
+    // So requestAnimatinFrame events fire
+    pretendToBeVisual: true,
+  })
+    .then((dom) => {
+      dom.window.URL.createObjectURL = (blob) => {
+        if (blob) {
+          return datauri.format(
+            blob.type,
+            blob[Object.getOwnPropertySymbols(blob)[0]]._buffer
+          ).content;
+        }
+      };
+      dom.window.URL.revokeObjectURL = (objectURL) => {};
+      dom.window.gameLoaded = () => {
+        server.listen(4000, function () {
+          console.log(`Listening on ${server.address().port}`);
+        });
+      };
+      dom.window.io = io;
+    })
+    .catch((error) => {
+      console.log(error.message);
+    });
+}
+setupAuthoritativePhaser();
