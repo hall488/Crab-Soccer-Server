@@ -100,13 +100,14 @@ function create() {
 
   io.on("connection", function (socket) {
     console.log("a user connected");
-    console.log(self.redTeam.children.length);
     // create a new player and add it to our players object
+    let team = Math.floor(Math.random() * 2) == 0 ? "red" : "blue";
+    let startPos = posMap(team, self[team+"Team"].getChildren().length);
     players[socket.id] = {
-      x: Math.floor(Math.random() * 700) + 50,
-      y: Math.floor(Math.random() * 500) + 50,
+      x: startPos.x,
+      y: startPos.y,
       playerId: socket.id,
-      team: Math.floor(Math.random() * 2) == 0 ? "red" : "blue",
+      team: team,
       input: {
         up: false,
         left: false,
@@ -135,7 +136,6 @@ function create() {
 
     socket.on("playerInput", function (inputData) {
       handlePlayerInput(self, socket.id, inputData);
-      console.log(inputData);
     });
   });
 }
@@ -172,7 +172,7 @@ function update() {
     !this.scoreState
   ) {
     this.scoreState = true;
-    this.score.red += 1;
+    this.score.blue += 1;
     resetField(this, this.players, this.ball);
   }
 
@@ -181,11 +181,43 @@ function update() {
     !this.scoreState
   ) {
     this.scoreState = true;
-    this.score.blue += 1;
+    this.score.red += 1;
     resetField(this, this.players, this.ball);
   }
 
   io.emit("gameUpdates", { players, ball: this.ball, score: this.score });
+}
+
+function posMap(team, spot) {
+  let map = team == "red" ? {
+    0: {
+      x: 1210/2 - 120,
+      y: 910/2
+    } ,
+    1:  {
+      x: 1210/2 - 75,
+      y: 910/2 - 100
+    },
+    2: {
+      x: 1210/2 - 75,
+      y: 910/2 + 100
+    }
+  } : {
+    0: {
+      x: 1210/2 + 120,
+      y: 910/2
+    } ,
+    1:  {
+      x: 1210/2 + 75,
+      y: 910/2 - 100
+    },
+    2: {
+      x: 1210/2 + 75,
+      y: 910/2 + 100
+    }
+  }
+
+  return map[spot];
 }
 
 function resetField(self, players, ball) {
@@ -195,16 +227,15 @@ function resetField(self, players, ball) {
     ball.setVelocity(0);
     ball.setAngularVelocity(0);
 
-    // let redCount = 0;
-    // let blueCount = 0;
+    self.redTeam.getChildren().forEach((player,index) => {
+      let startPos = posMap(player.team, index);
+      player.setPosition(startPos.x, startPos.y);
+    });
 
-    // players.getChildren().forEach(player => {
-    //     if(player.team == "red") {
-
-    //     } else if(player.team == "blue") {
-
-    //     }
-    // })
+    self.blueTeam.getChildren().forEach((player, index) => {
+      let startPos = posMap(player.team, index);
+      player.setPosition(startPos.x, startPos.y);
+    });
   }, 500);
 }
 
@@ -228,12 +259,8 @@ function addPlayer(self, playerInfo) {
   player.setScale(0.25);
   player.setFixedRotation(0);
 
-  if (player.team == "red") {
-    self.redTeam.add(player);
-  } else if (player.team == "blue") {
-    self.blueTeam.add(player);
-  }
-
+  player.team = playerInfo.team;
+  self[playerInfo.team+"Team"].add(player);
   self.players.add(player);
 }
 
